@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ALA Recording Time Calculator</title>
+<style>
+  :root{--crimson:#A51C30;--maroon:#4B1B1B;--cream:#FFEFD8;--gray-bg:#F4F3F1;--gray-line:#E3DFDB;--text:#2A2320;--text-soft:#5C5450;}
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{font-family:Arial,Helvetica,"Segoe UI",sans-serif;color:var(--text);background:#fff;line-height:1.5;}
+  .calc-wrap{max-width:900px;margin:0 auto;background:linear-gradient(160deg,#fff,var(--gray-bg));border:1px solid var(--gray-line);border-radius:12px;padding:24px 26px;}
+  h1{font-size:1.15rem;color:var(--crimson);margin:0 0 4px;}
+  .intro{font-size:0.9rem;color:var(--text-soft);margin:0 0 18px;}
+  .calc-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;}
+  @media (max-width:640px){.calc-grid{grid-template-columns:1fr;}.calc-wrap{padding:18px 16px;}}
+  .field{margin-bottom:16px;}
+  .field > label,.field .lbl{display:block;font-size:0.85rem;font-weight:700;color:var(--maroon);margin-bottom:6px;}
+  input[type="number"],select{width:100%;padding:10px 12px;border:1.5px solid var(--gray-line);border-radius:8px;font-size:1rem;font-family:inherit;background:#fff;}
+  .seg-choice{display:flex;gap:10px;flex-wrap:wrap;}
+  .seg-choice label{flex:1 1 auto;display:flex;align-items:center;gap:8px;border:1.5px solid var(--gray-line);border-radius:8px;padding:10px 12px;font-size:0.88rem;cursor:pointer;background:#fff;}
+  .seg-choice input{accent-color:var(--crimson);}
+  .seg-choice label.checked{border-color:var(--crimson);background:var(--cream);}
+  details summary{cursor:pointer;font-size:0.82rem;color:var(--crimson);font-weight:600;margin-bottom:8px;}
+  .result-panel{background:var(--maroon);color:#fff;border-radius:10px;padding:22px 24px;display:flex;flex-direction:column;justify-content:center;gap:14px;}
+  .metric{display:flex;justify-content:space-between;align-items:baseline;gap:10px;}
+  .metric .label{font-size:0.82rem;color:var(--cream);text-transform:uppercase;letter-spacing:0.04em;}
+  .metric .value{font-size:1.5rem;font-weight:700;}
+  hr{border:none;border-top:1px solid rgba(255,255,255,0.2);margin:2px 0;}
+  .fine{font-size:0.78rem;color:rgba(255,239,216,0.85);line-height:1.4;}
+  .warn{background:rgba(255,239,216,0.14);border:1px solid rgba(255,239,216,0.35);border-radius:8px;padding:8px 10px;font-size:0.78rem;color:var(--cream);}
+  .note{font-size:0.8rem;color:var(--text-soft);font-style:italic;margin:14px 0 0;}
+</style>
+</head>
+<body>
+<div class="calc-wrap">
+  <h1>Recording Time Calculator</h1>
+  <p class="intro">Estimate how much studio time an instructor will need, based on the number of segments they teach and how they'll deliver them.</p>
+  <div class="calc-grid">
+    <div>
+      <div class="field">
+        <label for="numSegments">Number of segments</label>
+        <input type="number" id="numSegments" min="1" max="60" value="7">
+      </div>
+      <div class="field">
+        <span class="lbl">Delivery style</span>
+        <div class="seg-choice">
+          <label><input type="radio" name="deliveryStyle" value="teleprompter" checked> Teleprompter (scripted)</label>
+          <label><input type="radio" name="deliveryStyle" value="offscript"> Off-script (freestyle)</label>
+        </div>
+      </div>
+      <div class="field">
+        <label for="familiarity">Instructor's familiarity with the material</label>
+        <select id="familiarity">
+          <option value="veryFamiliar">Very familiar: has taught or presented this before</option>
+          <option value="somewhatFamiliar" selected>Somewhat familiar: knows the content well</option>
+          <option value="newMaterial">New material: first time presenting this content</option>
+        </select>
+      </div>
+      <details>
+        <summary>Advanced: adjust average segment length</summary>
+        <div class="field">
+          <label for="segLength">Average minutes per segment (ALA guidance: 6–9 min)</label>
+          <input type="number" id="segLength" min="1" max="60" value="7.5" step="0.5">
+        </div>
+      </details>
+    </div>
+    <div class="result-panel" aria-live="polite">
+      <div class="metric"><span class="label">Est. recording time</span><span class="value" id="outRecordingTime">—</span></div>
+      <hr>
+      <div class="metric"><span class="label">Est. studio days needed</span><span class="value" id="outStudioDays">—</span></div>
+      <div class="fine" id="outAssumptions">—</div>
+      <div class="warn" id="outWarning" style="display:none;"></div>
+    </div>
+  </div>
+  <p class="note">A rough planning estimate based on ALA's Stage 2 guidance. Actual studio time varies by instructor and content; confirm final scheduling with your Instructional Design team.</p>
+</div>
+<script>
+(function(){
+  var MULTIPLIERS={teleprompter:{veryFamiliar:1.10,somewhatFamiliar:1.15,newMaterial:1.30},offscript:{veryFamiliar:1.50,somewhatFamiliar:2.00,newMaterial:3.00}};
+  var MAX_MIN_PER_DAY=6*60;
+  var $=function(id){return document.getElementById(id);};
+  var radios=document.getElementsByName('deliveryStyle');
+  function style(){for(var i=0;i<radios.length;i++){if(radios[i].checked)return radios[i].value;}return 'teleprompter';}
+  function fmt(m){m=Math.round(m);var h=Math.floor(m/60),r=m%60;if(!h)return r+' min';if(!r)return h+' hr';return h+' hr '+r+' min';}
+  function recalc(){
+    for(var i=0;i<radios.length;i++){radios[i].parentNode.className=radios[i].checked?'checked':'';}
+    var seg=parseFloat($('numSegments').value)||0,len=parseFloat($('segLength').value)||7.5,st=style(),fam=$('familiarity').value;
+    if(seg<=0){$('outRecordingTime').textContent='—';$('outStudioDays').textContent='—';$('outAssumptions').textContent='Enter a number of segments to see an estimate.';$('outWarning').style.display='none';return;}
+    var mult=MULTIPLIERS[st][fam],est=seg*len*mult,days=Math.max(1,Math.ceil(est/MAX_MIN_PER_DAY));
+    $('outRecordingTime').textContent=fmt(est);
+    $('outStudioDays').textContent=days+(days===1?' day':' days');
+    $('outAssumptions').textContent='Based on '+seg+' segment(s) × ~'+len+' min, '+(st==='teleprompter'?'teleprompter':'off-script')+' delivery, ×'+mult.toFixed(2)+' factor for familiarity. Studio days assume a 6-hour daily cap.';
+    var w=$('outWarning');
+    if(st==='teleprompter'){w.style.display='block';w.textContent='Reminder: teleprompter scripts need to be submitted a couple of days before filming.';}
+    else if(fam==='newMaterial'){w.style.display='block';w.textContent='New, off-script material can run substantially longer than estimated. Build in buffer time.';}
+    else{w.style.display='none';}
+  }
+  ['numSegments','segLength'].forEach(function(id){$(id).addEventListener('input',recalc);});
+  $('familiarity').addEventListener('change',recalc);
+  for(var i=0;i<radios.length;i++){radios[i].addEventListener('change',recalc);}
+  recalc();
+})();
+</script>
+</body>
+</html>

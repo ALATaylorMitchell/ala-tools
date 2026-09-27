@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ALA Program Timeline</title>
+<style>
+  :root{
+    --crimson:#A51C30; --maroon:#4B1B1B; --cream:#FFEFD8;
+    --bg:#FFFFFF; --panel:#F7F6F4; --line:#E3DFDB; --grid:#EEEBE8;
+    --text:#2A2320; --text-2:#5C5450; --muted:#8A817C;
+    --c-design:#2F6F9F; --c-prod:#A51C30; --c-launch:#B87A1E;
+    --warn-bg:#FFF4E0; --warn-line:#E0B25C; --err-bg:#FDECEE; --err-line:#D98A95;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{font-family:Arial,Helvetica,"Segoe UI",sans-serif;color:var(--text);background:var(--bg);line-height:1.5;}
+  .wrap{max-width:1040px;margin:0 auto;padding:20px 16px 40px;}
+  h1{font-size:1.3rem;color:var(--crimson);margin:0 0 4px;}
+  .intro{color:var(--text-2);font-size:0.95rem;margin:0 0 18px;max-width:760px;}
+
+  /* controls */
+  .controls{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:16px;}
+  .toggle{display:inline-flex;border:1.5px solid var(--crimson);border-radius:9px;overflow:hidden;margin-bottom:16px;}
+  .toggle button{font:inherit;font-size:0.9rem;font-weight:600;border:0;background:#fff;color:var(--crimson);padding:9px 16px;cursor:pointer;}
+  .toggle button[aria-pressed="true"]{background:var(--crimson);color:#fff;}
+  .toggle button:focus-visible{outline:3px solid var(--maroon);outline-offset:-3px;}
+  .fields{display:grid;grid-template-columns:repeat(3,1fr) auto;gap:14px;align-items:end;}
+  @media (max-width:760px){.fields{grid-template-columns:1fr;}}
+  .field label{display:block;font-size:0.82rem;font-weight:700;color:var(--maroon);margin-bottom:5px;}
+  .field .hint{display:block;font-size:0.75rem;color:var(--muted);margin-top:4px;}
+  .field input{width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:8px;font:inherit;font-size:0.95rem;background:#fff;color:var(--text);}
+  .field input:focus{outline:none;border-color:var(--crimson);}
+  .btn-reset{font:inherit;font-size:0.85rem;font-weight:600;background:#fff;color:var(--crimson);border:1.5px solid var(--crimson);border-radius:8px;padding:9px 14px;cursor:pointer;white-space:nowrap;}
+  .btn-reset:hover{background:var(--cream);}
+
+  /* messages + stats */
+  .msg{border-radius:10px;padding:10px 14px;font-size:0.88rem;margin:0 0 14px;display:none;}
+  .msg.warn{display:block;background:var(--warn-bg);border:1px solid var(--warn-line);}
+  .msg.err{display:block;background:var(--err-bg);border:1px solid var(--err-line);}
+  .msg strong{color:var(--maroon);}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
+  @media (max-width:760px){.stats{grid-template-columns:repeat(2,1fr);}}
+  .stat{border:1px solid var(--line);border-radius:10px;padding:12px 14px;}
+  .stat .k{font-size:0.72rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-2);}
+  .stat .v{font-size:1.15rem;font-weight:700;color:var(--text);margin-top:2px;}
+  .stat .s{font-size:0.78rem;color:var(--muted);}
+
+  /* legend */
+  .legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:0.82rem;color:var(--text-2);margin:0 0 10px;}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .sw{width:14px;height:10px;border-radius:3px;display:inline-block;}
+  .dia{width:10px;height:10px;transform:rotate(45deg);background:var(--maroon);display:inline-block;border-radius:1px;}
+  .dot{width:8px;height:8px;border-radius:50%;background:#fff;border:2px solid var(--c-launch);display:inline-block;}
+
+  /* gantt */
+  .chart{border:1px solid var(--line);border-radius:12px;overflow-x:auto;background:#fff;}
+  .gantt{min-width:720px;position:relative;padding:0 14px 10px 0;}
+  .g-head,.g-row{display:grid;grid-template-columns:210px 1fr;}
+  .g-head{position:sticky;top:0;background:#fff;z-index:2;border-bottom:1px solid var(--line);}
+  .g-head .lbl{font-size:0.72rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);padding:10px 12px;}
+  .months{position:relative;height:36px;}
+  .months .m{position:absolute;top:0;height:100%;border-left:1px solid var(--grid);font-size:0.72rem;color:var(--text-2);padding:10px 0 0 5px;white-space:nowrap;}
+  .months .m.yr{border-left-color:#CFC8C2;font-weight:700;color:var(--text);}
+  .g-body{position:relative;}
+  .g-grid{position:absolute;top:0;bottom:0;left:210px;right:14px;pointer-events:none;}
+  .g-grid .gl{position:absolute;top:0;bottom:0;border-left:1px solid var(--grid);}
+  .g-grid .today{position:absolute;top:0;bottom:0;border-left:2px dashed var(--muted);}
+  .g-grid .today span{position:absolute;top:2px;left:4px;font-size:0.68rem;color:var(--muted);background:#fff;padding:0 3px;}
+  .g-row{min-height:34px;align-items:center;}
+  .g-row .name{font-size:0.84rem;padding:6px 12px;color:var(--text);line-height:1.25;}
+  .g-row.ms .name{font-weight:700;color:var(--maroon);}
+  .g-row.sec .name{padding-top:14px;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);font-weight:700;}
+  .track{position:relative;height:34px;}
+  .bar{position:absolute;top:9px;height:16px;border-radius:4px;cursor:pointer;outline:none;}
+  .bar:hover,.bar:focus-visible{box-shadow:0 0 0 2px #fff,0 0 0 4px var(--text);}
+  .bar.faded{opacity:0.45;}
+  .bar .ls{position:absolute;top:3px;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:#fff;border:2px solid var(--c-launch);}
+  .ms-mark{position:absolute;top:11px;width:13px;height:13px;margin-left:-6.5px;transform:rotate(45deg);background:var(--maroon);border:2px solid #fff;box-shadow:0 0 0 1px var(--maroon);cursor:pointer;outline:none;border-radius:2px;}
+  .ms-mark:focus-visible,.ms-mark:hover{box-shadow:0 0 0 1px var(--maroon),0 0 0 4px rgba(75,27,27,0.25);}
+  .ms-date{position:absolute;top:8px;font-size:0.78rem;color:var(--text-2);white-space:nowrap;}
+  .scroll-hint{display:none;font-size:0.78rem;color:var(--muted);margin:0 0 6px;}
+  @media (max-width:640px){
+    .g-head,.g-row{grid-template-columns:128px 1fr;}
+    .g-grid{left:128px;}
+    .g-row .name{font-size:0.76rem;padding:5px 8px;}
+    .gantt{min-width:640px;}
+    .scroll-hint{display:block;}
+  }
+  .tip{position:fixed;z-index:50;pointer-events:none;background:#2A2320;color:#fff;font-size:0.8rem;line-height:1.4;padding:8px 10px;border-radius:8px;max-width:260px;box-shadow:0 4px 14px rgba(0,0,0,0.2);display:none;}
+  .tip b{display:block;margin-bottom:2px;}
+
+  /* phase list (table view) */
+  h2{font-size:1.05rem;color:var(--maroon);margin:26px 0 10px;}
+  .phases{list-style:none;margin:0;padding:0;}
+  .phases li{display:grid;grid-template-columns:170px 1fr;gap:14px;padding:12px 0;border-top:1px solid var(--line);}
+  @media (max-width:640px){.phases li{grid-template-columns:1fr;gap:4px;}}
+  .phases .when{font-size:0.84rem;font-weight:700;color:var(--text);}
+  .phases .when small{display:block;font-weight:400;color:var(--muted);}
+  .phases h3{font-size:0.95rem;margin:0 0 3px;display:flex;align-items:center;gap:8px;}
+  .phases p{margin:0 0 4px;font-size:0.88rem;color:var(--text-2);}
+  .phases .you{font-size:0.86rem;color:var(--text);}
+  .phases .you b{color:var(--crimson);}
+  .phases li.milestone h3{color:var(--maroon);}
+  .note{font-size:0.8rem;color:var(--muted);font-style:italic;margin-top:16px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Your Program Timeline</h1>
+  <p class="intro">This shows ALA's standard development timeline, from approval to launch. Choose your program type, then adjust the key dates to see how the rest of the timeline shifts.</p>
+
+  <div class="controls">
+    <div class="toggle" role="group" aria-label="Program type">
+      <button type="button" id="tSelf" aria-pressed="true">Self-paced</button>
+      <button type="button" id="tBlend" aria-pressed="false">Blended (live cohort)</button>
+    </div>
+    <div class="fields">
+      <div class="field">
+        <label for="dAccept">Program accepted by ALA</label>
+        <input type="date" id="dAccept">
+        <span class="hint">The date your Stage 1 proposal was approved</span>
+      </div>
+      <div class="field">
+        <label for="dRecord">Recording starts</label>
+        <input type="date" id="dRecord">
+        <span class="hint" id="hRecord">Standard: about 11 weeks after acceptance</span>
+      </div>
+      <div class="field">
+        <label for="dEnd" id="lEnd">Course opens for enrollment</label>
+        <input type="date" id="dEnd">
+        <span class="hint" id="hEnd">Standard: about 15 weeks after recording starts</span>
+      </div>
+      <button type="button" class="btn-reset" id="btnReset">Reset to standard</button>
+    </div>
+  </div>
+
+  <div class="msg" id="msg" role="status" aria-live="polite"></div>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="legend" aria-hidden="true">
+    <span><i class="sw" style="background:var(--c-design)"></i>Planning &amp; design</span>
+    <span><i class="sw" style="background:var(--c-prod)"></i>Production</span>
+    <span><i class="sw" style="background:var(--c-launch)"></i>Launch &amp; delivery</span>
+    <span><i class="dia"></i>Key date</span>
+    <span id="lgLive" style="display:none"><i class="dot"></i>Live session</span>
+  </div>
+
+  <p class="scroll-hint">Scroll sideways to see the full timeline. Tap a bar for dates.</p>
+  <div class="chart" id="chart"><div class="gantt" id="gantt"></div></div>
+
+  <h2>Phase by phase</h2>
+  <ul class="phases" id="phaseList"></ul>
+
+  <p class="note">These dates are estimates based on ALA's standard timeline. Your Program Lead will share a detailed project plan and adjust it with you as your program takes shape. Nothing you enter here is saved or sent anywhere.</p>
+</div>
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script>
+(function(){
+  /* ---------- Timeline models ----------
+     seg 0 = acceptance -> recording start (scales with your dates)
+     seg 1 = recording start -> enrollment opens / cohort starts (scales)
+     seg 2 = after that date (fixed weeks)
+     s/e/at are in weeks within the segment, based on ALA's standard plan. */
+  var MODELS = {
+    self: {
+      endLabel:'Course opens for enrollment', endShort:'Enrollment opens',
+      L0:11, L1:15, min0:8, min1:10,
+      items:[
+        {sec:'Before recording'},
+        {n:'Welcome & kickoff',c:'design',g:0,s:0,e:2,d:'Your Program Lead sends next steps (Stage 2 template, this hub, your SharePoint folder) and schedules the administrative and instructional design kickoff calls.',y:'Share your availability and start your Stage 2 proposal.'},
+        {n:'Stage 2 & syllabus',c:'design',g:0,s:2,e:6,d:'Modules, segments, exercises, and the mini-capstone are finalized, and the filming window is set. Marketing drafts web copy and a "subscribe for updates" page.',y:'Complete Stage 2, confirm who teaches which segments, and approve your web copy.'},
+        {n:'Content development & filming prep',c:'design',g:0,s:6,e:11,d:'The instructional design team helps develop content and exercises. Faculty are invited to film, paperwork is sent, and the studio is booked.',y:'Invite any guest faculty, draft slides or scripts, and return faculty paperwork.'},
+        {m:'Recording starts',g:1,at:0,key:'R',d:'Filming begins in the studio.'},
+        {sec:'Recording to launch'},
+        {n:'Recording',c:'prod',g:1,s:0,e:6,d:'Slides and scripts are finalized and filming takes place, with ALA staff on hand to guide you.',y:'Film your segments. Teleprompter scripts are due a couple of days before filming.'},
+        {n:'Video editing & review',c:'prod',g:1,s:5,e:12,d:'Recorded segments are edited, then reviewed with you.',y:'Review edited videos and request any changes.'},
+        {n:'Canvas build & testing',c:'prod',g:1,s:8,e:14,d:'Your course is built in Canvas, exercises and assessments are finalized, and everything is tested.',y:'Review the course in Canvas.'},
+        {n:'Launch prep',c:'launch',g:1,s:12,e:15,d:'Marketing materials are prepared, faculty agreements and payments are processed, and final checks are completed.',y:'Get ready to share the course with your networks.'},
+        {m:'Course opens for enrollment',g:1,at:15,key:'E',d:'Your course goes live and learners can begin enrolling.'},
+        {sec:'After launch'},
+        {n:'Ongoing enrollment & delivery',c:'launch',g:2,s:0,e:13,faded:true,d:'Learners enroll and complete the course on a rolling basis. Your Program Lead handles learner questions and Canvas upkeep.',y:'Promote the course through your networks.'},
+        {m:'First quarterly check-in',g:2,at:13,d:'The Online Division reviews enrollment and learner feedback each quarter. A full PRO review with you happens annually.'}
+      ]
+    },
+    blend: {
+      endLabel:'Cohort starts', endShort:'Cohort starts',
+      L0:19, L1:19, min0:14, min1:14,
+      items:[
+        {sec:'Before recording'},
+        {n:'Welcome & kickoff',c:'design',g:0,s:0,e:2,d:'Your Program Lead sends next steps and schedules the administrative and instructional design kickoff calls.',y:'Share your availability and start your Stage 2 proposal.'},
+        {n:'Stage 2 & syllabus',c:'design',g:0,s:2,e:7,d:'Modules, segments, exercises, and the mini-capstone are finalized. Marketing drafts web copy and a "subscribe for updates" page.',y:'Complete Stage 2 and approve your web copy.'},
+        {n:'Faculty & cohort dates confirmed',c:'design',g:0,s:7,e:10,d:'Instructors for recording and live sessions are confirmed, first-cohort and live-session dates are set, calendar holds are sent, and faculty paperwork goes out.',y:'Confirm cohort and live-session dates, confirm your faculty, and return paperwork.'},
+        {m:'Enrollment opens',g:0,at:11,key:'O',d:'The course opens for enrollment on the ALA website, well before recording, so the cohort can fill.'},
+        {n:'Content development & Canvas design',c:'design',g:0,s:7,e:18,d:'Module materials are developed (starting with Module 1 as a model), the Canvas structure is outlined, and assessments are built and reviewed.',y:'Develop module content with the instructional design team.'},
+        {n:'Slides & filming prep',c:'design',g:0,s:15,e:19,d:'Presentation aids are prepared, slides are branded and aligned with scripts, and filming reminders go out.',y:'Finalize your slides or scripts.'},
+        {m:'Recording starts',g:1,at:0,key:'R',d:'Filming begins in the studio.'},
+        {sec:'Recording to cohort'},
+        {n:'Marketing campaign',c:'launch',g:-1,faded:true,d:'Emails, direct mail, digital ads, and a webinar promote the course until the cohort starts.',y:'Share the course with your networks, and join the promotional webinar if scheduled.'},
+        {n:'Recording',c:'prod',g:1,s:0,e:4,d:'Filming takes place, with ALA staff on hand to guide you.',y:'Film your segments. Teleprompter scripts are due a couple of days before filming.'},
+        {n:'Video editing & review',c:'prod',g:1,s:4,e:11,d:'Recorded segments are edited in rounds, then reviewed.',y:'Review edited videos and request any changes.'},
+        {n:'Canvas build & testing',c:'prod',g:1,s:9,e:16,d:'Videos and materials are uploaded to Canvas, and the course is tested and reviewed ahead of the first delivery.',y:'Review the course in Canvas.'},
+        {n:'Learner onboarding',c:'launch',g:1,s:16,e:19,d:'Participants receive logistics emails and a Canvas heads-up.',y:'Confirm any final details for live sessions.'},
+        {m:'Cohort starts',g:1,at:19,key:'C',d:'The first cohort begins the 16-week program.'},
+        {sec:'Delivery & review'},
+        {n:'Cohort runs (16 weeks)',c:'launch',g:2,s:0,e:16,live:[0,4,10,15],d:'Learners work through the course, with four 90-minute live sessions (around weeks 1, 5, 11, and 16). Your Program Lead supports each session and tracks learner progress.',y:'Lead the live sessions.'},
+        {n:'Certificates & evaluation',c:'launch',g:2,s:16,e:18,d:'Evaluations go out, and credit letters and certificates are sent to participants.',y:''},
+        {n:'PRO review',c:'launch',g:2,s:20,e:25,d:'Evaluation, marketing, and finance data are compiled into a PRO report and reviewed with you, ideally within about 2 months of the cohort ending.',y:'Join the PRO meeting and help set priorities for the next cohort.'}
+      ]
+    }
+  };
+
+  /* ---------- date helpers (UTC days, so no DST drift) ---------- */
+  var DAY=86400000;
+  function parse(v){if(!v)return null;var p=v.split('-');return Date.UTC(+p[0],+p[1]-1,+p[2]);}
+  function iso(t){var d=new Date(t);return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0');}
+  var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function fmt(t){var d=new Date(t);return MON[d.getUTCMonth()]+' '+d.getUTCDate()+', '+d.getUTCFullYear();}
+  function fmtShort(t){var d=new Date(t);return MON[d.getUTCMonth()]+' '+d.getUTCDate();}
+  function weeks(a,b){return Math.round((b-a)/DAY/7);}
+  function todayUTC(){var n=new Date();return Date.UTC(n.getFullYear(),n.getMonth(),n.getDate());}
+
+  /* ---------- state ---------- */
+  var type='self', touched={R:false,E:false};
+  var $=function(id){return document.getElementById(id);};
+  var elA=$('dAccept'),elR=$('dRecord'),elE=$('dEnd');
+
+  function standardFill(){
+    var M=MODELS[type],A=parse(elA.value);
+    if(!touched.R) elR.value=iso(A+M.L0*7*DAY);
+    var R=parse(elR.value);
+    if(!touched.E) elE.value=iso(R+M.L1*7*DAY);
+  }
+
+  function setType(t){
+    type=t; touched={R:false,E:false};
+    $('tSelf').setAttribute('aria-pressed',t==='self');
+    $('tBlend').setAttribute('aria-pressed',t==='blend');
+    var M=MODELS[t];
+    $('lEnd').textContent=M.endLabel;
+    $('hRecord').textContent='Standard: about '+M.L0+' weeks after acceptance';
+    $('hEnd').textContent='Standard: about '+M.L1+' weeks after recording starts';
+    $('lgLive').style.display=t==='blend'?'inline-flex':'none';
+    standardFill(); render();
+  }
+
+  /* ---------- compute ---------- */
+  function compute(){
+    var M=MODELS[type],A=parse(elA.value),R=parse(elR.value),E=parse(elE.value);
+    function at(g,w){
+      if(g===0) return A+(w/M.L0)*(R-A);
+      if(g===1) return R+(w/M.L1)*(E-R);
+      return E+w*7*DAY;
+    }
+    var rows=[],openT=null;
+    M.items.forEach(function(it){
+      if(it.sec){rows.push({sec:it.sec});return;}
+      if(it.m){var t=at(it.g,it.at);if(it.key==='O')openT=t;rows.push({m:it.m,t:t,d:it.d});return;}
+      var r={n:it.n,c:it.c,d:it.d,y:it.y,faded:it.faded};
+      if(it.g===-1){r.s=openT;r.e=E;}
+      else{r.s=at(it.g,it.s);r.e=at(it.g,it.e);}
+      if(it.live){r.live=it.live.map(function(w){return E+w*7*DAY;});}
+      rows.push(r);
+    });
+    return {A:A,R:R,E:E,rows:rows,openT:openT};
+  }
+
+  /* ---------- render ---------- */
+  var tip=$('tip');
+  function showTip(el,html){
+    tip.innerHTML=html;tip.style.display='block';
+    var r=el.getBoundingClientRect(),w=tip.offsetWidth,h=tip.offsetHeight;
+    var x=Math.min(Math.max(8,r.left+r.width/2-w/2),window.innerWidth-w-8);
+    var y=r.top-h-8; if(y<8)y=r.bottom+8;
+    tip.style.left=x+'px';tip.style.top=y+'px';
+  }
+  function hideTip(){tip.style.display='none';}
+  function bindTip(el,html){
+    el.addEventListener('mouseenter',function(){showTip(el,html);});
+    el.addEventListener('mouseleave',hideTip);
+    el.addEventListener('focus',function(){showTip(el,html);});
+    el.addEventListener('blur',hideTip);
+    el.addEventListener('click',function(e){e.stopPropagation();showTip(el,html);});
+  }
+  document.addEventListener('click',hideTip);
+  window.addEventListener('scroll',hideTip,true);
+
+  function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+
+  function render(){
+    var M=MODELS[type],A=parse(elA.value),R=parse(elR.value),E=parse(elE.value),msg=$('msg');
+    msg.className='msg';msg.innerHTML='';
+    if(A===null||R===null||E===null){msg.className='msg err';msg.innerHTML='<strong>Enter all three dates</strong> to see your timeline.';return;}
+    if(R<=A){msg.className='msg err';msg.innerHTML='<strong>Recording needs to start after the program is accepted.</strong> Please adjust the dates.';clearOut();return;}
+    if(E<=R){msg.className='msg err';msg.innerHTML='<strong>'+esc(M.endShort)+' needs to come after recording starts.</strong> Please adjust the dates.';clearOut();return;}
+
+    var w0=weeks(A,R),w1=weeks(R,E),notes=[];
+    if(w0<M.min0) notes.push('Only <strong>'+w0+' weeks</strong> from acceptance to recording (standard: about '+M.L0+'). That is very compressed; please talk with your Program Lead before committing to these dates.');
+    else if(w0<M.L0) notes.push('<strong>'+w0+' weeks</strong> from acceptance to recording is shorter than the standard '+M.L0+'. Stage 2 and content development will need to move faster.');
+    if(w1<M.min1) notes.push('Only <strong>'+w1+' weeks</strong> from recording to '+esc(M.endShort.toLowerCase())+' (standard: about '+M.L1+'). That leaves little time for editing and the Canvas build; please talk with your Program Lead.');
+    else if(w1<M.L1) notes.push('<strong>'+w1+' weeks</strong> from recording to '+esc(M.endShort.toLowerCase())+' is shorter than the standard '+M.L1+'. Editing and the Canvas build will be tighter.');
+    if(notes.length){msg.className='msg warn';msg.innerHTML=notes.join('<br>');}
+
+    var C=compute();
+    // stats
+    var total=weeks(A,E),months=(total/4.345).toFixed(1).replace(/\.0$/,'');
+    var st='';
+    st+=stat('Accepted',fmt(A),'Start of the timeline');
+    st+=stat('Recording starts',fmt(R),w0+' weeks after acceptance');
+    if(type==='blend') st+=stat('Enrollment opens',fmt(C.openT),weeks(A,C.openT)+' weeks after acceptance');
+    st+=stat(M.endShort,fmt(E),'About '+months+' months after acceptance');
+    if(type==='self') st+=stat('Total development','~'+months+' months',total+' weeks, acceptance to launch');
+    $('stats').innerHTML=st;
+
+    drawGantt(C);
+    drawList(C);
+  }
+  function stat(k,v,s){return '<div class="stat"><div class="k">'+k+'</div><div class="v">'+v+'</div><div class="s">'+s+'</div></div>';}
+  function clearOut(){$('stats').innerHTML='';$('gantt').innerHTML='';$('phaseList').innerHTML='';}
+
+  function drawGantt(C){
+    var start=C.A,end=C.A;
+    C.rows.forEach(function(r){if(r.e&&r.e>end)end=r.e;if(r.t&&r.t>end)end=r.t;});
+    var d0=new Date(start);start=Date.UTC(d0.getUTCFullYear(),d0.getUTCMonth(),1);
+    var d1=new Date(end);end=Date.UTC(d1.getUTCFullYear(),d1.getUTCMonth()+1,1);
+    var span=end-start;
+    function pct(t){return ((t-start)/span*100).toFixed(3)+'%';}
+
+    var h='<div class="g-head"><div class="lbl">Phase</div><div class="months">';
+    var gl='';
+    var cur=new Date(start);
+    while(Date.UTC(cur.getUTCFullYear(),cur.getUTCMonth(),1)<end){
+      var t=Date.UTC(cur.getUTCFullYear(),cur.getUTCMonth(),1),yr=cur.getUTCMonth()===0||t===start;
+      var label=MON[cur.getUTCMonth()]+(yr?' \u2019'+String(cur.getUTCFullYear()).slice(2):'');
+      h+='<div class="m'+(yr?' yr':'')+'" style="left:'+pct(t)+'">'+label+'</div>';
+      gl+='<div class="gl" style="left:'+pct(t)+'"></div>';
+      cur.setUTCMonth(cur.getUTCMonth()+1);
+    }
+    h+='</div></div><div class="g-body"><div class="g-grid">'+gl;
+    var td=todayUTC();
+    if(td>=start&&td<=end) h+='<div class="today" style="left:'+pct(td)+'"><span>Today</span></div>';
+    h+='</div>';
+
+    var colors={design:'var(--c-design)',prod:'var(--c-prod)',launch:'var(--c-launch)'};
+    C.rows.forEach(function(r,i){
+      if(r.sec){h+='<div class="g-row sec"><div class="name">'+esc(r.sec)+'</div><div class="track" style="height:22px"></div></div>';return;}
+      if(r.m){
+        var left=(r.t-start)/span*100,dateLeft=left>80?'right:'+(100-left+2)+'%':'left:calc('+left+'% + 12px)';
+        h+='<div class="g-row ms"><div class="name">'+esc(r.m)+'</div><div class="track"><span class="ms-mark" tabindex="0" data-i="'+i+'" style="left:'+pct(r.t)+'" aria-label="'+esc(r.m)+': '+fmt(r.t)+'"></span><span class="ms-date" style="'+dateLeft+'">'+fmt(r.t)+'</span></div></div>';
+        return;
+      }
+      var w=((r.e-r.s)/span*100);
+      var live='';
+      if(r.live) r.live.forEach(function(t){live+='<i class="ls" style="left:'+Math.min(96,Math.max(4,((t-r.s)/(r.e-r.s))*100+3)).toFixed(2)+'%"></i>';});
+      h+='<div class="g-row"><div class="name">'+esc(r.n)+'</div><div class="track"><span class="bar'+(r.faded?' faded':'')+'" tabindex="0" data-i="'+i+'" style="left:'+pct(r.s)+';width:'+Math.max(w,0.6).toFixed(3)+'%;background:'+colors[r.c]+'" aria-label="'+esc(r.n)+': '+fmt(r.s)+' to '+fmt(r.e)+'">'+live+'</span></div></div>';
+    });
+    h+='</div>';
+    $('gantt').innerHTML=h;
+
+    Array.prototype.forEach.call($('gantt').querySelectorAll('[data-i]'),function(el){
+      var r=C.rows[+el.getAttribute('data-i')],html;
+      if(r.m) html='<b>'+esc(r.m)+'</b>'+fmt(r.t)+'<br>'+esc(r.d);
+      else{
+        html='<b>'+esc(r.n)+'</b>'+fmtShort(r.s)+' – '+fmt(r.e)+' ('+Math.max(1,weeks(r.s,r.e))+' wks)';
+        if(r.live) html+='<br>Live sessions: '+r.live.map(fmtShort).join(', ');
+      }
+      bindTip(el,html);
+    });
+  }
+
+  function drawList(C){
+    var h='';
+    C.rows.forEach(function(r){
+      if(r.sec) return;
+      if(r.m){
+        h+='<li class="milestone"><div class="when">'+fmt(r.t)+'<small>Key date</small></div><div><h3><i class="dia"></i>'+esc(r.m)+'</h3><p>'+esc(r.d)+'</p></div></li>';
+        return;
+      }
+      var col={design:'var(--c-design)',prod:'var(--c-prod)',launch:'var(--c-launch)'}[r.c];
+      h+='<li><div class="when">'+fmtShort(r.s)+' – '+fmt(r.e)+'<small>About '+Math.max(1,weeks(r.s,r.e))+' weeks</small></div><div><h3><i class="sw" style="background:'+col+'"></i>'+esc(r.n)+'</h3><p>'+esc(r.d)+'</p>';
+      if(r.live) h+='<p>Live sessions (approx.): '+r.live.map(fmtShort).join(', ')+'</p>';
+      if(r.y) h+='<div class="you"><b>Your part:</b> '+esc(r.y)+'</div>';
+      h+='</div></li>';
+    });
+    $('phaseList').innerHTML=h;
+  }
+
+  /* ---------- events ---------- */
+  $('tSelf').addEventListener('click',function(){if(type!=='self')setType('self');});
+  $('tBlend').addEventListener('click',function(){if(type!=='blend')setType('blend');});
+  elA.addEventListener('change',function(){if(parse(elA.value)!==null){standardFill();}render();});
+  elR.addEventListener('change',function(){touched.R=true;if(!touched.E&&parse(elR.value)!==null){elE.value=iso(parse(elR.value)+MODELS[type].L1*7*DAY);}render();});
+  elE.addEventListener('change',function(){touched.E=true;render();});
+  $('btnReset').addEventListener('click',function(){touched={R:false,E:false};elA.value=iso(todayUTC());standardFill();render();});
+
+  elA.value=iso(todayUTC());
+  setType('self');
+})();
+</script>
+</body>
+</html>
